@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, kalai } from '@/lib/supabase'
+import { ROLE_LABELS, INVITABLE_ROLES } from '@/lib/roles'
 
 interface Organization {
   id: string
@@ -26,6 +27,7 @@ interface MemberRow {
 interface InvitationRow {
   id: string
   email: string
+  role: string
   status: string
   token: string
 }
@@ -71,13 +73,16 @@ export default function HomePage() {
   const [orgName, setOrgName] = useState('')
   const [orgType, setOrgType] = useState('club')
   const [inviteEmail, setInviteEmail] = useState('')
-  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null)
+  const [inviteRole, setInviteRole] = useState('coach')
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null)
 
   const activeMembership = memberships?.find((m) => m.organization_id === activeOrgId) ?? memberships?.[0] ?? null
   const activeOrg = activeMembership?.organizations ?? null
-  const isAdmin = activeOrg && userId ? activeOrg.admin_user_id === userId : false
+  const myMembership = members?.find((m) => m.user_id === userId) ?? null
+  const isAdmin = myMembership?.role === 'admin'
 
   const loadOrgDetails = useCallback(async (organizationId: string) => {
     const { data: memberRows } = await kalai
@@ -101,7 +106,7 @@ export default function HomePage() {
 
     const { data: inviteRows } = await kalai
       .from('invitations')
-      .select('id, email, status, token')
+      .select('id, email, role, status, token')
       .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -170,24 +175,63 @@ export default function HomePage() {
     if (!activeOrg || !userId) return
     setErrorMsg(null)
     setSaving(true)
-    const { data, error } = await kalai
-      .from('invitations')
-      .insert({
-        organization_id: activeOrg.id,
-        email: inviteEmail.trim().toLowerCase(),
-        role: 'entrenador',
-        invited_by: userId,
-      })
-      .select('token')
-      .single()
+    const { error } = await kalai.from('invitations').insert({
+      organization_id: activeOrg.id,
+      email: inviteEmail.trim().toLowerCase(),
+      role: inviteRole,
+      invited_by: userId,
+    })
     setSaving(false)
     if (error) {
       setErrorMsg(error.message)
       return
     }
-    setLastInviteLink(`${window.location.origin}/invite/${data.token}`)
     setInviteEmail('')
     await loadOrgDetails(activeOrg.id)
+  }
+
+  async function handleChangeRole(memberUserId: string, role: string) {
+    if (!activeOrg) return
+    setErrorMsg(null)
+    const { error } = await kalai
+      .from('organization_members')
+      .update({ role })
+      .eq('organization_id', activeOrg.id)
+      .eq('user_id', memberUserId)
+    if (error) {
+      setErrorMsg(error.message)
+      return
+    }
+    await loadOrgDetails(activeOrg.id)
+  }
+
+  async function handleRemoveMember(memberUserId: string) {
+    if (!activeOrg) return
+    if (!window.confirm('¿Quitar a esta persona de la organización?')) return
+    setErrorMsg(null)
+    const { error } = await kalai
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', activeOrg.id)
+      .eq('user_id', memberUserId)
+    if (error) {
+      setErrorMsg(error.message)
+      return
+    }
+    setExpandedMemberId(null)
+    await loadOrgDetails(activeOrg.id)
+  }
+
+  async function copyInviteLink(invitationId: string, token: string) {
+    const link = `${window.location.origin}/invite/${token}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedInviteId(invitationId)
+      setTimeout(() => setCopiedInviteId(null), 2000)
+    } catch {
+      // Clipboard API puede fallar (permiso, contexto no seguro) — el
+      // link igual queda visible en pantalla para copiar a mano.
+    }
   }
 
   async function handleSignOut() {
@@ -276,16 +320,51 @@ export default function HomePage() {
           </div>
 
           <div className="card">
-            <div className="sectionTitle">Entrenadores</div>
+            <div className="sectionTitle">Miembros</div>
             {members && members.length > 0 ? (
-              members.map((m) => (
-                <div className="memberRow" key={m.user_id}>
-                  <span>{m.email}</span>
-                  <span className="badge">{m.role === 'admin' ? 'Admin' : 'Entrenador'}</span>
-                </div>
-              ))
+              members.map((m) => {
+                const expanded = expandedMemberId === m.user_id
+                return (
+                  <div key={m.user_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <div
+                      className="memberRow"
+                      style={{ borderBottom: 'none', cursor: isAdmin ? 'pointer' : 'default' }}
+                      onClick={() => isAdmin && setExpandedMemberId(expanded ? null : m.user_id)}
+                    >
+                      <span>{m.email}</span>
+                      <span className="badge">{ROLE_LABELS[m.role] ?? m.role}</span>
+                    </div>
+                    {isAdmin && expanded && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 16 }}>
+                        <div>
+                          <div className="label">Rol</div>
+                          <select
+                            className="select"
+                            value={m.role}
+                            onChange={(e) => handleChangeRole(m.user_id, e.target.value)}
+                          >
+                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {errorMsg && <div className="error">{errorMsg}</div>}
+                        <button
+                          className="button buttonSecondary"
+                          style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                          onClick={() => handleRemoveMember(m.user_id)}
+                        >
+                          Quitar de la organización
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             ) : (
-              <div className="subtitle">Todavía no hay entrenadores.</div>
+              <div className="subtitle">Todavía no hay miembros.</div>
             )}
 
             {invitations && invitations.length > 0 && (
@@ -294,15 +373,20 @@ export default function HomePage() {
                   Invitaciones pendientes
                 </div>
                 {invitations.map((inv) => (
-                  <div className="memberRow" key={inv.id}>
-                    <span>{inv.email}</span>
-                    <button
-                      className="link"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                      onClick={() => setLastInviteLink(`${window.location.origin}/invite/${inv.token}`)}
-                    >
-                      Copiar link
-                    </button>
+                  <div key={inv.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div className="rowBetween">
+                      <span>
+                        {inv.email} <span style={{ color: 'var(--muted)' }}>· {ROLE_LABELS[inv.role] ?? inv.role}</span>
+                      </span>
+                      <button
+                        className="link"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={() => copyInviteLink(inv.id, inv.token)}
+                      >
+                        {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
+                      </button>
+                    </div>
+                    <div className="code" style={{ marginTop: 6 }}>{`${window.location.origin}/invite/${inv.token}`}</div>
                   </div>
                 ))}
               </>
@@ -310,7 +394,7 @@ export default function HomePage() {
 
             {isAdmin && (
               <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
-                <div className="sectionTitle">Invitar entrenador</div>
+                <div className="sectionTitle">Invitar miembro</div>
                 <div>
                   <div className="label">Email</div>
                   <input
@@ -321,16 +405,20 @@ export default function HomePage() {
                     required
                   />
                 </div>
+                <div>
+                  <div className="label">Rol</div>
+                  <select className="select" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+                    {INVITABLE_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {errorMsg && <div className="error">{errorMsg}</div>}
                 <button className="button" type="submit" disabled={saving}>
                   {saving ? 'Invitando…' : 'Invitar'}
                 </button>
-                {lastInviteLink && (
-                  <div>
-                    <div className="label">Mandale este link a la persona invitada:</div>
-                    <div className="code">{lastInviteLink}</div>
-                  </div>
-                )}
               </form>
             )}
           </div>

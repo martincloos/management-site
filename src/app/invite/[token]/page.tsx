@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase, kalai } from '@/lib/supabase'
+import { ROLE_LABELS } from '@/lib/roles'
 
 interface InvitationPreview {
   id: string
@@ -114,7 +115,7 @@ export default function InvitePage() {
           Invitación a {invitation?.organizationName}
         </div>
         <div className="subtitle">
-          Te invitaron a unirte como {invitation?.role === 'entrenador' ? 'entrenador' : invitation?.role}.
+          Te invitaron a unirte como {invitation ? (ROLE_LABELS[invitation.role] ?? invitation.role) : ''}.
         </div>
         {errorMsg && <div className="error">{errorMsg}</div>}
         <button className="button" onClick={handleAccept} disabled={accepting}>
