@@ -222,6 +222,18 @@ export default function HomePage() {
     await loadOrgDetails(activeOrg.id)
   }
 
+  async function handleRevokeInvitation(invitationId: string) {
+    if (!activeOrg) return
+    if (!window.confirm('¿Cancelar esta invitación? El link deja de funcionar.')) return
+    setErrorMsg(null)
+    const { error } = await kalai.from('invitations').update({ status: 'revoked' }).eq('id', invitationId)
+    if (error) {
+      setErrorMsg(error.message)
+      return
+    }
+    await loadOrgDetails(activeOrg.id)
+  }
+
   async function copyInviteLink(invitationId: string, token: string) {
     const link = `${window.location.origin}/invite/${token}`
     try {
@@ -378,13 +390,22 @@ export default function HomePage() {
                       <span>
                         {inv.email} <span style={{ color: 'var(--muted)' }}>· {ROLE_LABELS[inv.role] ?? inv.role}</span>
                       </span>
-                      <button
-                        className="link"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                        onClick={() => copyInviteLink(inv.id, inv.token)}
-                      >
-                        {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 14 }}>
+                        <button
+                          className="link"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                          onClick={() => copyInviteLink(inv.id, inv.token)}
+                        >
+                          {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
+                        </button>
+                        <button
+                          className="link"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)' }}
+                          onClick={() => handleRevokeInvitation(inv.id)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                     <div className="code" style={{ marginTop: 6 }}>{`${window.location.origin}/invite/${inv.token}`}</div>
                   </div>
