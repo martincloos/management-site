@@ -29,6 +29,8 @@ decisiones propias de esta app (código, deploy, diseño).
   varios bugs reales de RLS/permisos en el schema `kalai` (grants
   faltantes, recursión de policies, visibilidad de perfiles) — todos
   corregidos y documentados en el `CHANGELOG.md` de Coach Data
-  (migraciones `019` a `022`). Sin desplegar todavía — falta decidir
-  dominio final y aplicar los pasos de deploy a Vercel (ver
-  `feedback_vercel_monorepo_deploy_gotchas` en memoria de Claude Code).
+  (migraciones `019` a `022`).
+- **Desplegado**: repo en `github.com/martincloos/management-site`,
+  proyecto Vercel `kalai-analytics/management-site` (env vars de
+  producción/preview cargadas), dominio propio `analytics.kalai.com.ar`
+  (registro A → `76.76.21.21`) con HTTPS activo. Verificado en vivo.

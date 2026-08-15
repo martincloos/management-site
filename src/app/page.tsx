@@ -30,6 +30,24 @@ interface InvitationRow {
   token: string
 }
 
+interface SubscriptionRow {
+  plan_type: string
+  status: string
+  expires_at: string | null
+  trial_ends_at: string | null
+}
+
+// Misma lógica que apps/mobile/src/context/SubscriptionContext.tsx de
+// Coach Data — no hay paquete compartido entre repos, se copia el
+// cálculo (pequeño y estable) en vez de importar entre proyectos.
+function isCurrentlyPro(row: SubscriptionRow | null): boolean {
+  if (!row) return false
+  const now = Date.now()
+  if (row.status === 'active') return row.expires_at == null || new Date(row.expires_at).getTime() > now
+  if (row.status === 'trialing') return row.trial_ends_at != null && new Date(row.trial_ends_at).getTime() > now
+  return false
+}
+
 type GateState = 'loading' | 'signedOut' | 'ready'
 
 const ORG_TYPES = [
@@ -42,7 +60,9 @@ export default function HomePage() {
   const router = useRouter()
   const [state, setState] = useState<GateState>('loading')
   const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
 
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
   const [memberships, setMemberships] = useState<Membership[] | null>(null)
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null)
   const [members, setMembers] = useState<MemberRow[] | null>(null)
@@ -96,6 +116,14 @@ export default function HomePage() {
         return
       }
       setUserId(session.user.id)
+      setUserEmail(session.user.email ?? null)
+
+      const { data: subscriptionRow } = await supabase
+        .from('subscriptions')
+        .select('plan_type, status, expires_at, trial_ends_at')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+      setSubscription(subscriptionRow)
 
       const { data: membershipRows } = await kalai
         .from('organization_members')
@@ -180,16 +208,30 @@ export default function HomePage() {
       <div className="rowBetween">
         <div>
           <div className="title">Kalai Analytics</div>
-          <div className="subtitle">Gestión de tu organización.</div>
+          <div className="subtitle">Tu cuenta de Kalai.</div>
         </div>
         <button className="button buttonSecondary" onClick={handleSignOut}>
           Cerrar sesión
         </button>
       </div>
 
+      <div className="card">
+        <div className="rowBetween">
+          <div>
+            <div className="sectionTitle">Tu cuenta</div>
+            <div style={{ fontSize: 16, marginTop: 4 }}>{userEmail}</div>
+          </div>
+          <span className="badge">{isCurrentlyPro(subscription) ? 'Pro' : 'Gratis'}</span>
+        </div>
+      </div>
+
       {!activeOrg ? (
         <form className="card" onSubmit={handleCreateOrg}>
           <div className="sectionTitle">Crear organización</div>
+          <div className="subtitle">
+            ¿Tu club ya tiene una organización en Kalai? Pedile a quien la administra el link de invitación en vez de
+            crear una nueva.
+          </div>
           <div>
             <div className="label">Nombre</div>
             <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
