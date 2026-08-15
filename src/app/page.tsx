@@ -77,6 +77,7 @@ export default function HomePage() {
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
+  const [expandedInviteId, setExpandedInviteId] = useState<string | null>(null)
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null)
 
   const activeMembership = memberships?.find((m) => m.organization_id === activeOrgId) ?? memberships?.[0] ?? null
@@ -384,32 +385,42 @@ export default function HomePage() {
                 <div className="sectionTitle" style={{ marginTop: 8 }}>
                   Invitaciones pendientes
                 </div>
-                {invitations.map((inv) => (
-                  <div key={inv.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div className="rowBetween">
-                      <span>
-                        {inv.email} <span style={{ color: 'var(--muted)' }}>· {ROLE_LABELS[inv.role] ?? inv.role}</span>
-                      </span>
-                      <div style={{ display: 'flex', gap: 14 }}>
-                        <button
-                          className="link"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                          onClick={() => copyInviteLink(inv.id, inv.token)}
-                        >
-                          {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
-                        </button>
-                        <button
-                          className="link"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)' }}
-                          onClick={() => handleRevokeInvitation(inv.id)}
-                        >
-                          Cancelar
-                        </button>
+                {invitations.map((inv) => {
+                  const expanded = expandedInviteId === inv.id
+                  return (
+                    <div key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <div
+                        className="memberRow"
+                        style={{ borderBottom: 'none', cursor: 'pointer' }}
+                        onClick={() => setExpandedInviteId(expanded ? null : inv.id)}
+                      >
+                        <span>{inv.email}</span>
+                        <span className="badge">{ROLE_LABELS[inv.role] ?? inv.role}</span>
                       </div>
+                      {expanded && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
+                          <div className="code">{`${window.location.origin}/invite/${inv.token}`}</div>
+                          <div style={{ display: 'flex', gap: 16 }}>
+                            <button
+                              className="link"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                              onClick={() => copyInviteLink(inv.id, inv.token)}
+                            >
+                              {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
+                            </button>
+                            <button
+                              className="link"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)' }}
+                              onClick={() => handleRevokeInvitation(inv.id)}
+                            >
+                              Cancelar invitación
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="code" style={{ marginTop: 6 }}>{`${window.location.origin}/invite/${inv.token}`}</div>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )}
 
