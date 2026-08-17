@@ -101,7 +101,7 @@ export default function InvitePage() {
         <div className="card">
           <div className="success">¡Listo! Ya formás parte de {invitation?.organizationName}.</div>
           <button className="button" onClick={() => router.push('/')}>
-            Ir a la organización
+            Ir a mi cuenta
           </button>
         </div>
       </div>

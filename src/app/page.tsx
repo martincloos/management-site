@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase, kalai } from '@/lib/supabase'
-import { ROLE_LABELS, INVITABLE_ROLES } from '@/lib/roles'
 
 interface Organization {
   id: string
   name: string
   type: string
-  admin_user_id: string
 }
 
 interface Membership {
@@ -18,18 +17,25 @@ interface Membership {
   organizations: Organization
 }
 
-interface MemberRow {
+interface PendingInvitation {
+  id: string
+  token: string
   role: string
-  user_id: string
-  email: string
+  organizations: { name: string } | null
 }
 
-interface InvitationRow {
+interface EventSummary {
   id: string
-  email: string
-  role: string
-  status: string
+  name: string
+  start_date: string | null
+  end_date: string | null
+}
+
+interface PendingEventInvitation {
+  id: string
   token: string
+  role: string
+  events: { name: string } | null
 }
 
 interface SubscriptionRow {
@@ -50,68 +56,90 @@ function isCurrentlyPro(row: SubscriptionRow | null): boolean {
   return false
 }
 
+const ORG_TYPES: Record<string, string> = {
+  club: 'Club',
+  federacion: 'Federación',
+  asociacion: 'Asociación',
+}
+
+function extractInviteToken(input: string): string | null {
+  const match = input.trim().match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/)
+  return match ? match[0] : null
+}
+
 type GateState = 'loading' | 'signedOut' | 'ready'
 
-const ORG_TYPES = [
-  { value: 'club', label: 'Club' },
-  { value: 'federacion', label: 'Federación' },
-  { value: 'asociacion', label: 'Asociación' },
-]
-
-export default function HomePage() {
+export default function PersonalPage() {
   const router = useRouter()
   const [state, setState] = useState<GateState>('loading')
-  const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
 
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
-  const [memberships, setMemberships] = useState<Membership[] | null>(null)
-  const [activeOrgId, setActiveOrgId] = useState<string | null>(null)
-  const [members, setMembers] = useState<MemberRow[] | null>(null)
-  const [invitations, setInvitations] = useState<InvitationRow[] | null>(null)
+  const [memberships, setMemberships] = useState<Membership[]>([])
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([])
+  const [myEvents, setMyEvents] = useState<EventSummary[]>([])
+  const [pendingEventInvitations, setPendingEventInvitations] = useState<PendingEventInvitation[]>([])
 
   const [orgName, setOrgName] = useState('')
   const [orgType, setOrgType] = useState('club')
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('coach')
-  const [saving, setSaving] = useState(false)
+  const [creatingOrg, setCreatingOrg] = useState(false)
+  const [showCreateOrg, setShowCreateOrg] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
-  const [expandedInviteId, setExpandedInviteId] = useState<string | null>(null)
-  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null)
 
-  const activeMembership = memberships?.find((m) => m.organization_id === activeOrgId) ?? memberships?.[0] ?? null
-  const activeOrg = activeMembership?.organizations ?? null
-  const myMembership = members?.find((m) => m.user_id === userId) ?? null
-  const isAdmin = myMembership?.role === 'admin'
+  const [showCreateEvent, setShowCreateEvent] = useState(false)
+  const [eventName, setEventName] = useState('')
+  const [eventDescription, setEventDescription] = useState('')
+  const [eventStart, setEventStart] = useState('')
+  const [eventEnd, setEventEnd] = useState('')
+  const [creatingEvent, setCreatingEvent] = useState(false)
+  const [joinEventCode, setJoinEventCode] = useState('')
 
-  const loadOrgDetails = useCallback(async (organizationId: string) => {
-    const { data: memberRows } = await kalai
+  const loadPersonalData = useCallback(async (userId: string, email: string) => {
+    const { data: subscriptionRow } = await supabase
+      .from('subscriptions')
+      .select('plan_type, status, expires_at, trial_ends_at')
+      .eq('user_id', userId)
+      .maybeSingle()
+    setSubscription(subscriptionRow)
+
+    const { data: membershipRows } = await kalai
       .from('organization_members')
-      .select('role, user_id')
-      .eq('organization_id', organizationId)
-
-    const memberIds = (memberRows ?? []).map((m) => m.user_id)
-    const { data: profileRows } = memberIds.length
-      ? await supabase.from('profiles').select('id, email').in('id', memberIds)
-      : { data: [] }
-    const emailById = new Map((profileRows ?? []).map((p) => [p.id, p.email as string]))
-
-    setMembers(
-      (memberRows ?? []).map((m) => ({
-        role: m.role,
-        user_id: m.user_id,
-        email: emailById.get(m.user_id) ?? m.user_id,
-      })),
-    )
+      .select('role, organization_id, organizations(id, name, type)')
+      .eq('user_id', userId)
+    setMemberships((membershipRows ?? []) as unknown as Membership[])
 
     const { data: inviteRows } = await kalai
       .from('invitations')
-      .select('id, email, role, status, token')
-      .eq('organization_id', organizationId)
+      .select('id, token, role, organizations(name)')
+      .eq('email', email.toLowerCase())
       .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-    setInvitations(inviteRows ?? [])
+      .is('event_id', null)
+    setPendingInvitations((inviteRows ?? []) as unknown as PendingInvitation[])
+
+    const { data: createdEvents } = await kalai
+      .from('events')
+      .select('id, name, start_date, end_date')
+      .eq('created_by', userId)
+    const { data: memberEvents } = await kalai
+      .from('event_memberships')
+      .select('events(id, name, start_date, end_date)')
+      .eq('user_id', userId)
+    const eventsById = new Map<string, EventSummary>()
+    for (const ev of createdEvents ?? []) eventsById.set(ev.id, ev)
+    for (const row of (memberEvents ?? []) as unknown as { events: EventSummary | null }[]) {
+      if (row.events) eventsById.set(row.events.id, row.events)
+    }
+    setMyEvents(Array.from(eventsById.values()))
+
+    const { data: eventInviteRows } = await kalai
+      .from('invitations')
+      .select('id, token, role, events(name)')
+      .eq('email', email.toLowerCase())
+      .eq('status', 'pending')
+      .not('event_id', 'is', null)
+    setPendingEventInvitations((eventInviteRows ?? []) as unknown as PendingEventInvitation[])
   }, [])
 
   useEffect(() => {
@@ -121,130 +149,73 @@ export default function HomePage() {
         setState('signedOut')
         return
       }
-      setUserId(session.user.id)
-      setUserEmail(session.user.email ?? null)
+      const email = session.user.email ?? ''
+      setUserEmail(email)
 
-      const { data: subscriptionRow } = await supabase
-        .from('subscriptions')
-        .select('plan_type, status, expires_at, trial_ends_at')
-        .eq('user_id', session.user.id)
-        .maybeSingle()
-      setSubscription(subscriptionRow)
+      const { data: profile } = await supabase.from('profiles').select('name').eq('id', session.user.id).maybeSingle()
+      setUserName(profile?.name ?? null)
 
-      const { data: membershipRows } = await kalai
-        .from('organization_members')
-        .select('role, organization_id, organizations(id, name, type, admin_user_id)')
-        .eq('user_id', session.user.id)
-
-      const typed = (membershipRows ?? []) as unknown as Membership[]
-      setMemberships(typed)
-      if (typed.length > 0) {
-        setActiveOrgId(typed[0].organization_id)
-        await loadOrgDetails(typed[0].organization_id)
-      }
+      await loadPersonalData(session.user.id, email)
       setState('ready')
     })
-  }, [router, loadOrgDetails])
-
-  useEffect(() => {
-    if (activeOrgId) loadOrgDetails(activeOrgId)
-  }, [activeOrgId, loadOrgDetails])
+  }, [router, loadPersonalData])
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg(null)
-    setSaving(true)
+    setCreatingOrg(true)
     const { data, error } = await kalai.rpc('create_organization', { p_name: orgName, p_type: orgType })
-    setSaving(false)
+    setCreatingOrg(false)
     if (error) {
       setErrorMsg(error.message)
       return
     }
-    const { data: membershipRows } = await kalai
-      .from('organization_members')
-      .select('role, organization_id, organizations(id, name, type, admin_user_id)')
-      .eq('user_id', userId as string)
-    const typed = (membershipRows ?? []) as unknown as Membership[]
-    setMemberships(typed)
     if (data?.id) {
-      setActiveOrgId(data.id)
+      router.push(`/organizaciones/${data.id}`)
     }
   }
 
-  async function handleInvite(e: React.FormEvent) {
+  function handleJoinByCode(e: React.FormEvent) {
     e.preventDefault()
-    if (!activeOrg || !userId) return
     setErrorMsg(null)
-    setSaving(true)
-    const { error } = await kalai.from('invitations').insert({
-      organization_id: activeOrg.id,
-      email: inviteEmail.trim().toLowerCase(),
-      role: inviteRole,
-      invited_by: userId,
+    const token = extractInviteToken(joinCode)
+    if (!token) {
+      setErrorMsg('No pudimos reconocer ese código o link de invitación.')
+      return
+    }
+    router.push(`/invite/${token}`)
+  }
+
+  async function handleCreateEvent(e: React.FormEvent) {
+    e.preventDefault()
+    setErrorMsg(null)
+    setCreatingEvent(true)
+    const { data, error } = await kalai.rpc('create_event', {
+      p_name: eventName,
+      p_description: eventDescription.trim() || null,
+      p_start_date: eventStart || null,
+      p_end_date: eventEnd || null,
+      p_organization_id: null,
     })
-    setSaving(false)
+    setCreatingEvent(false)
     if (error) {
       setErrorMsg(error.message)
       return
     }
-    setInviteEmail('')
-    await loadOrgDetails(activeOrg.id)
+    if (data?.id) {
+      router.push(`/eventos/${data.id}`)
+    }
   }
 
-  async function handleChangeRole(memberUserId: string, role: string) {
-    if (!activeOrg) return
+  function handleJoinEventByCode(e: React.FormEvent) {
+    e.preventDefault()
     setErrorMsg(null)
-    const { error } = await kalai
-      .from('organization_members')
-      .update({ role })
-      .eq('organization_id', activeOrg.id)
-      .eq('user_id', memberUserId)
-    if (error) {
-      setErrorMsg(error.message)
+    const token = extractInviteToken(joinEventCode)
+    if (!token) {
+      setErrorMsg('No pudimos reconocer ese código o link de invitación.')
       return
     }
-    await loadOrgDetails(activeOrg.id)
-  }
-
-  async function handleRemoveMember(memberUserId: string) {
-    if (!activeOrg) return
-    if (!window.confirm('¿Quitar a esta persona de la organización?')) return
-    setErrorMsg(null)
-    const { error } = await kalai
-      .from('organization_members')
-      .delete()
-      .eq('organization_id', activeOrg.id)
-      .eq('user_id', memberUserId)
-    if (error) {
-      setErrorMsg(error.message)
-      return
-    }
-    setExpandedMemberId(null)
-    await loadOrgDetails(activeOrg.id)
-  }
-
-  async function handleRevokeInvitation(invitationId: string) {
-    if (!activeOrg) return
-    if (!window.confirm('¿Cancelar esta invitación? El link deja de funcionar.')) return
-    setErrorMsg(null)
-    const { error } = await kalai.from('invitations').update({ status: 'revoked' }).eq('id', invitationId)
-    if (error) {
-      setErrorMsg(error.message)
-      return
-    }
-    await loadOrgDetails(activeOrg.id)
-  }
-
-  async function copyInviteLink(invitationId: string, token: string) {
-    const link = `${window.location.origin}/invite/${token}`
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopiedInviteId(invitationId)
-      setTimeout(() => setCopiedInviteId(null), 2000)
-    } catch {
-      // Clipboard API puede fallar (permiso, contexto no seguro) — el
-      // link igual queda visible en pantalla para copiar a mano.
-    }
+    router.push(`/invite/${token}`)
   }
 
   async function handleSignOut() {
@@ -260,12 +231,14 @@ export default function HomePage() {
     )
   }
 
+  const pro = isCurrentlyPro(subscription)
+
   return (
     <div className="page">
       <div className="rowBetween">
         <div>
           <div className="title">Kalai Analytics</div>
-          <div className="subtitle">Tu cuenta de Kalai.</div>
+          <div className="subtitle">Tu cuenta.</div>
         </div>
         <button className="button buttonSecondary" onClick={handleSignOut}>
           Cerrar sesión
@@ -275,187 +248,187 @@ export default function HomePage() {
       <div className="card">
         <div className="rowBetween">
           <div>
-            <div className="sectionTitle">Tu cuenta</div>
-            <div style={{ fontSize: 16, marginTop: 4 }}>{userEmail}</div>
+            <div className="sectionTitle">Información personal</div>
+            <div style={{ fontSize: 16, marginTop: 4 }}>{userName || userEmail}</div>
+            <div className="subtitle" style={{ marginTop: 2 }}>{userEmail}</div>
           </div>
-          <span className="badge">{isCurrentlyPro(subscription) ? 'Pro' : 'Gratis'}</span>
+          <Link className="link" href="/perfil">
+            Editar
+          </Link>
         </div>
       </div>
 
-      {!activeOrg ? (
-        <form className="card" onSubmit={handleCreateOrg}>
-          <div className="sectionTitle">Crear organización</div>
-          <div className="subtitle">
-            ¿Tu club ya tiene una organización en Kalai? Pedile a quien la administra el link de invitación en vez de
-            crear una nueva.
+      <div className="card">
+        <div className="sectionTitle">Suscripciones</div>
+        <div className="memberRow">
+          <span>Coach Data</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="badge">{pro ? 'Pro' : 'Gratis'}</span>
+            {!pro && (
+              <a className="link" href="https://kalai.com.ar/pro" target="_blank" rel="noopener noreferrer">
+                Adquirir
+              </a>
+            )}
           </div>
-          <div>
-            <div className="label">Nombre</div>
-            <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
-          </div>
-          <div>
-            <div className="label">Tipo</div>
-            <select className="select" value={orgType} onChange={(e) => setOrgType(e.target.value)}>
-              {ORG_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {errorMsg && <div className="error">{errorMsg}</div>}
-          <button className="button" type="submit" disabled={saving}>
-            {saving ? 'Creando…' : 'Crear organización'}
+        </div>
+        <div className="memberRow" style={{ opacity: 0.5 }}>
+          <span>Regatta RC</span>
+          <span className="badge">Próximamente</span>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="rowBetween">
+          <div className="sectionTitle">Organizaciones</div>
+          <button className="link" style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setShowCreateOrg((v) => !v)}>
+            {showCreateOrg ? 'Cancelar' : '+ Crear'}
+          </button>
+        </div>
+
+        {memberships.length > 0 ? (
+          memberships.map((m) => (
+            <Link key={m.organization_id} href={`/organizaciones/${m.organization_id}`} className="memberRow" style={{ cursor: 'pointer' }}>
+              <span>{m.organizations.name}</span>
+              <span className="badge">{ORG_TYPES[m.organizations.type] ?? m.organizations.type}</span>
+            </Link>
+          ))
+        ) : (
+          <div className="subtitle">Todavía no formás parte de ninguna organización.</div>
+        )}
+
+        {pendingInvitations.length > 0 && (
+          <>
+            <div className="sectionTitle" style={{ marginTop: 8 }}>
+              Invitaciones pendientes
+            </div>
+            {pendingInvitations.map((inv) => (
+              <Link key={inv.id} href={`/invite/${inv.token}`} className="memberRow" style={{ cursor: 'pointer' }}>
+                <span>{inv.organizations?.name ?? 'Organización'}</span>
+                <span className="link">Ver invitación</span>
+              </Link>
+            ))}
+          </>
+        )}
+
+        {showCreateOrg && (
+          <form onSubmit={handleCreateOrg} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
+            <div>
+              <div className="label">Nombre</div>
+              <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
+            </div>
+            <div>
+              <div className="label">Tipo</div>
+              <select className="select" value={orgType} onChange={(e) => setOrgType(e.target.value)}>
+                {Object.entries(ORG_TYPES).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {errorMsg && <div className="error">{errorMsg}</div>}
+            <button className="button" type="submit" disabled={creatingOrg}>
+              {creatingOrg ? 'Creando…' : 'Crear organización'}
+            </button>
+          </form>
+        )}
+
+        <form onSubmit={handleJoinByCode} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input
+            className="input"
+            placeholder="Pegar código o link de invitación"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+          />
+          <button className="button buttonSecondary" type="submit">
+            Unirme
           </button>
         </form>
-      ) : (
-        <>
-          <div className="card">
-            <div className="rowBetween">
-              <div>
-                <div className="sectionTitle">Organización</div>
-                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{activeOrg.name}</div>
-              </div>
-              <span className="badge">{ORG_TYPES.find((t) => t.value === activeOrg.type)?.label ?? activeOrg.type}</span>
+        {errorMsg && !showCreateOrg && <div className="error">{errorMsg}</div>}
+      </div>
+
+      <div className="card">
+        <div className="rowBetween">
+          <div className="sectionTitle">Eventos</div>
+          <button className="link" style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setShowCreateEvent((v) => !v)}>
+            {showCreateEvent ? 'Cancelar' : '+ Crear'}
+          </button>
+        </div>
+
+        {myEvents.length > 0 ? (
+          myEvents.map((ev) => (
+            <Link key={ev.id} href={`/eventos/${ev.id}`} className="memberRow" style={{ cursor: 'pointer' }}>
+              <span>{ev.name}</span>
+              <span className="subtitle">{ev.start_date ?? ''}</span>
+            </Link>
+          ))
+        ) : (
+          <div className="subtitle">Todavía no participás de ningún evento.</div>
+        )}
+
+        {pendingEventInvitations.length > 0 && (
+          <>
+            <div className="sectionTitle" style={{ marginTop: 8 }}>
+              Invitaciones pendientes
             </div>
-            {memberships && memberships.length > 1 && (
-              <div>
-                <div className="label">Cambiar de organización</div>
-                <select className="select" value={activeOrgId ?? ''} onChange={(e) => setActiveOrgId(e.target.value)}>
-                  {memberships.map((m) => (
-                    <option key={m.organization_id} value={m.organization_id}>
-                      {m.organizations.name}
-                    </option>
-                  ))}
-                </select>
+            {pendingEventInvitations.map((inv) => (
+              <Link key={inv.id} href={`/invite/${inv.token}`} className="memberRow" style={{ cursor: 'pointer' }}>
+                <span>{inv.events?.name ?? 'Evento'}</span>
+                <span className="link">Ver invitación</span>
+              </Link>
+            ))}
+          </>
+        )}
+
+        {showCreateEvent && (
+          <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
+            <div>
+              <div className="label">Nombre</div>
+              <input className="input" value={eventName} onChange={(e) => setEventName(e.target.value)} required />
+            </div>
+            <div>
+              <div className="label">Descripción</div>
+              <input className="input" value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div className="label">Desde</div>
+                <input className="input" type="date" value={eventStart} onChange={(e) => setEventStart(e.target.value)} />
               </div>
-            )}
-          </div>
+              <div style={{ flex: 1 }}>
+                <div className="label">Hasta</div>
+                <input className="input" type="date" value={eventEnd} onChange={(e) => setEventEnd(e.target.value)} />
+              </div>
+            </div>
+            {errorMsg && <div className="error">{errorMsg}</div>}
+            <button className="button" type="submit" disabled={creatingEvent}>
+              {creatingEvent ? 'Creando…' : 'Crear evento'}
+            </button>
+          </form>
+        )}
 
-          <div className="card">
-            <div className="sectionTitle">Miembros</div>
-            {members && members.length > 0 ? (
-              members.map((m) => {
-                const expanded = expandedMemberId === m.user_id
-                return (
-                  <div key={m.user_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <div
-                      className="memberRow"
-                      style={{ borderBottom: 'none', cursor: isAdmin ? 'pointer' : 'default' }}
-                      onClick={() => isAdmin && setExpandedMemberId(expanded ? null : m.user_id)}
-                    >
-                      <span>{m.email}</span>
-                      <span className="badge">{ROLE_LABELS[m.role] ?? m.role}</span>
-                    </div>
-                    {isAdmin && expanded && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 16 }}>
-                        <div>
-                          <div className="label">Rol</div>
-                          <select
-                            className="select"
-                            value={m.role}
-                            onChange={(e) => handleChangeRole(m.user_id, e.target.value)}
-                          >
-                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        {errorMsg && <div className="error">{errorMsg}</div>}
-                        <button
-                          className="button buttonSecondary"
-                          style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
-                          onClick={() => handleRemoveMember(m.user_id)}
-                        >
-                          Quitar de la organización
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            ) : (
-              <div className="subtitle">Todavía no hay miembros.</div>
-            )}
+        <form onSubmit={handleJoinEventByCode} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input
+            className="input"
+            placeholder="Pegar código o link de invitación"
+            value={joinEventCode}
+            onChange={(e) => setJoinEventCode(e.target.value)}
+          />
+          <button className="button buttonSecondary" type="submit">
+            Unirme
+          </button>
+        </form>
+      </div>
 
-            {invitations && invitations.length > 0 && (
-              <>
-                <div className="sectionTitle" style={{ marginTop: 8 }}>
-                  Invitaciones pendientes
-                </div>
-                {invitations.map((inv) => {
-                  const expanded = expandedInviteId === inv.id
-                  return (
-                    <div key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <div
-                        className="memberRow"
-                        style={{ borderBottom: 'none', cursor: 'pointer' }}
-                        onClick={() => setExpandedInviteId(expanded ? null : inv.id)}
-                      >
-                        <span>{inv.email}</span>
-                        <span className="badge">{ROLE_LABELS[inv.role] ?? inv.role}</span>
-                      </div>
-                      {expanded && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
-                          <div className="code">{`${window.location.origin}/invite/${inv.token}`}</div>
-                          <div style={{ display: 'flex', gap: 16 }}>
-                            <button
-                              className="link"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                              onClick={() => copyInviteLink(inv.id, inv.token)}
-                            >
-                              {copiedInviteId === inv.id ? '¡Copiado!' : 'Copiar link'}
-                            </button>
-                            <button
-                              className="link"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)' }}
-                              onClick={() => handleRevokeInvitation(inv.id)}
-                            >
-                              Cancelar invitación
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </>
-            )}
-
-            {isAdmin && (
-              <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
-                <div className="sectionTitle">Invitar miembro</div>
-                <div>
-                  <div className="label">Email</div>
-                  <input
-                    className="input"
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <div className="label">Rol</div>
-                  <select className="select" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
-                    {INVITABLE_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {errorMsg && <div className="error">{errorMsg}</div>}
-                <button className="button" type="submit" disabled={saving}>
-                  {saving ? 'Invitando…' : 'Invitar'}
-                </button>
-              </form>
-            )}
-          </div>
-        </>
-      )}
+      <div className="card" style={{ opacity: 0.5 }}>
+        <div className="rowBetween">
+          <div className="sectionTitle">Análisis</div>
+          <span className="badge">Próximamente</span>
+        </div>
+        <div className="subtitle">
+          Vas a poder ver mapas y reportes de tus sesiones acá{!pro && ' — disponible solo con Coach Data Pro'}.
+        </div>
+      </div>
     </div>
   )
 }
