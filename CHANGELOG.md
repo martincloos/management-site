@@ -9,6 +9,23 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-08-19 — Corrección: el webhook de Regatta RC Pro se muda al proyecto de Regatta RC
+
+- **Qué se hizo**: se borran `src/lib/regattaAdmin.ts` y
+  `src/app/api/webhooks/regattarc-mercadopago/` de este repo. Esa
+  lógica pasa a `supabase/functions/regattarc-mercadopago-webhook/` del
+  repo de **regatta-cr** (ver su CHANGELOG). `api/checkout/regattarc`
+  (que arma el pago) no cambia — solo el webhook que lo confirma.
+- **Por qué**: la primera versión guardaba acá la `service_role` del
+  proyecto Supabase de Regatta RC (`REGATTA_CR_SUPABASE_SERVICE_ROLE_KEY`)
+  para que el webhook pudiera escribir `subscriptions` — viola la regla
+  explícita de ese proyecto ("no service_role key de un proyecto
+  circulando en el otro") y amplía sin necesidad el radio de explosión
+  de un secreto con escritura total sobre esa base a un tercer repo.
+  Encontrado en revisión de código antes de configurar los secrets en
+  producción — nunca llegó a estar expuesto en vivo. Sin cambios para
+  el usuario, sigue comprando desde acá.
+
 ## 2026-08-19 — Suscripciones: checkout real de Regatta RC + unifica el de Coach Data
 
 - **Qué se hizo**: la tarjeta "Suscripciones" del hub Personal (`/`,
