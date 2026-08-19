@@ -9,6 +9,69 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-08-19 — Suscripciones: checkout real de Regatta RC + unifica el de Coach Data
+
+- **Qué se hizo**: la tarjeta "Suscripciones" del hub Personal (`/`,
+  antes solo mostraba estado + un link externo a `kalai.com.ar/pro`)
+  pasa a tener un botón real **"+ Agregar"** que ofrece los productos
+  que todavía no son Pro (Coach Data / Regatta RC), con selector
+  mensual/anual (anual preseleccionado — precio la mitad de 12 meses
+  sueltos, a propósito, para empujar la conversión anual) y pago directo
+  con Mercado Pago sin salir del sitio ni retipear el email (ya se sabe
+  quién sos por la sesión activa).
+  - **Coach Data**: nueva ruta `api/checkout/coachdata` que es un simple
+    puente hacia el checkout que YA vive en producción en
+    `apps/web` de Coach Data (`/api/checkout/mercadopago`) — no se
+    duplica esa lógica, solo se evita la vuelta al sitio externo.
+  - **Regatta RC**: primer checkout real de este producto. Nueva ruta
+    `api/checkout/regattarc` (arma la preapproval de Mercado Pago
+    directo, MISMA cuenta/Access Token que Coach Data — decisión
+    explícita del usuario) y nuevo webhook
+    `api/webhooks/regattarc-mercadopago` (mismo algoritmo de firma que
+    el de Coach Data, secreto PROPIO) que escribe en la
+    `subscriptions` del proyecto Supabase de Regatta RC vía un cliente
+    `service_role` nuevo (`src/lib/regattaAdmin.ts`).
+  - **Precio Regatta RC** (cerrado con el usuario 2026-08-19): ARS
+    7.500/mes · USD 5/mes · ARS 45.000/año · USD 30/año — el anual es
+    literalmente la mitad de 12 meses sueltos (a diferencia de Coach
+    Data, que da ~2 meses gratis), a propósito.
+  - **El puente de identidad es la parte no obvia**: como Regatta RC es
+    un proyecto Supabase separado (ver `docs/INTEGRATION.md` de ese
+    repo), antes de crear la preapproval el checkout invoca
+    server-side la misma función `exchange-kalai-session` que ya usan
+    `race-committee`/`admin`/`RaceCoursesSection` — garantiza que el
+    uuid del usuario ya existe como `auth.users` en el proyecto de
+    Regatta RC ANTES de cobrar, porque si no el `upsert` del webhook
+    (asíncrono, sin el token del usuario a mano) fallaría contra la FK
+    de `subscriptions.user_id`.
+  - No hizo falta ninguna migración nueva: la tabla `subscriptions` de
+    Regatta RC (migración `002_race_courses_and_access.sql`, columnas
+    `plan`/`status`/`current_period_end`) ya tenía `unique(user_id)`
+    desde el día uno.
+- **Pendiente del lado del usuario, antes de que esto cobre de verdad**:
+  1. Cargar en el entorno de producción de este sitio (Vercel):
+     `MERCADOPAGO_ACCESS_TOKEN` (mismo valor que ya tiene `apps/web` de
+     Coach Data), `MERCADOPAGO_REGATTARC_WEBHOOK_SECRET` (nueva, sale
+     del dashboard de Mercado Pago recién al registrar la URL de abajo),
+     `REGATTA_CR_SUPABASE_SERVICE_ROLE_KEY` (Settings → API del
+     proyecto `cpcjljvdhotrtlflbdbd`).
+  2. Registrar en el dashboard de Mercado Pago una nueva URL de webhook,
+     `https://analytics.kalai.com.ar/api/webhooks/regattarc-mercadopago`,
+     evento "Planes y suscripciones" — copiar la firma secreta que
+     entrega a `MERCADOPAGO_REGATTARC_WEBHOOK_SECRET`.
+  3. Probar de punta a punta con un pago real o el "Simular
+     notificación" de Mercado Pago — nada de esto se probó todavía
+     contra Mercado Pago real (mismo estado que tenía Coach Data antes
+     de su primer pago de prueba).
+- **Verificación de esta sesión**: `tsc --noEmit` limpio. No se pudo
+  probar en el navegador — otra sesión de Claude Code ya tenía el
+  dev server de este repo corriendo en el puerto 3002, y de todas
+  formas hace falta login real para llegar a la tarjeta de
+  Suscripciones (no se escribe la contraseña real del usuario, regla
+  dura).
+
+---
+
 ## 2026-08-16 — Eventos real + resto de las secciones descritas (algunas como placeholder)
 
 - **Qué se hizo**: nueva ruta `/eventos/[id]` — Información general
