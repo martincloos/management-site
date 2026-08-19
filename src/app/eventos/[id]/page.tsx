@@ -5,6 +5,18 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase, kalai } from '@/lib/supabase'
 import { EVENT_ROLE_LABELS, EVENT_INVITABLE_ROLES } from '@/lib/roles'
+import {
+  daysUntil,
+  eventBudgetUsd,
+  eventDays,
+  fetchOfficialArsRate,
+  isEventFinished,
+  PAYMENT_LOCK_DAYS,
+  PAYMENT_WARNING_DAYS,
+  type OfficialRate,
+} from '@/lib/budget'
+import RosterSection from '@/components/RosterSection'
+import RaceCoursesSection from '@/components/RaceCoursesSection'
 
 interface EventRow {
   id: string
@@ -14,7 +26,64 @@ interface EventRow {
   end_date: string | null
   organization_id: string | null
   created_by: string
+  venue_name: string | null
+  venue_address: string | null
+  venue_city: string | null
+  venue_country: string | null
+  num_classes: number | null
+  expected_participants: number | null
+  num_race_courses: number | null
+  paid: boolean
+  hidden_by_founder: boolean
   organizations: { name: string } | null
+}
+
+const PARTICIPANT_FIELDS = [
+  { key: 'full_name', label: 'Nombre completo', required: true },
+  { key: 'class', label: 'Clase' },
+  { key: 'club', label: 'Club' },
+  { key: 'sail_number', label: 'Vela' },
+  { key: 'dni', label: 'DNI' },
+  { key: 'birth_date', label: 'Fecha de nacimiento', type: 'date' as const },
+  { key: 'nationality', label: 'Nacionalidad' },
+  { key: 'fleet', label: 'Flota / color' },
+  { key: 'boat_group', label: 'Grupo de embarcación' },
+  { key: 'crew_role', label: 'Rol (timonel/tripulante)' },
+  { key: 'notes', label: 'Notas' },
+]
+
+const PARTICIPANT_ALIASES: Record<string, string[]> = {
+  full_name: ['timonel', 'nombre', 'apellido y nombre', 'nombre completo', 'navegante'],
+  class: ['clase', 'class'],
+  club: ['club'],
+  sail_number: ['vela', 'nº vela', 'numero de vela', 'sail'],
+  dni: ['dni', 'documento'],
+  birth_date: ['nac', 'nacimiento', 'fecha de nacimiento', 'fecha nacimiento'],
+  nationality: ['pais', 'país', 'nacionalidad'],
+  fleet: ['flotad1', 'flota', 'color', 'grupo'],
+  boat_group: ['boat_id', 'embarcacion', 'bote'],
+  crew_role: ['rol', 'timonel/tripulante'],
+  notes: ['notas', 'observaciones'],
+}
+
+const COACH_FIELDS = [
+  { key: 'full_name', label: 'Nombre completo', required: true },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Teléfono' },
+  { key: 'club', label: 'Club' },
+  { key: 'classes', label: 'Clases a cargo' },
+  { key: 'medical_note', label: 'Ficha médica' },
+  { key: 'notes', label: 'Notas' },
+]
+
+const COACH_ALIASES: Record<string, string[]> = {
+  full_name: ['nombre', 'apellido y nombre', 'nombre completo', 'entrenador'],
+  email: ['email', 'mail', 'correo'],
+  phone: ['telefono', 'teléfono', 'celular'],
+  club: ['club'],
+  classes: ['clase', 'clases', 'class'],
+  medical_note: ['ficha medica', 'ficha médica'],
+  notes: ['notas', 'observaciones'],
 }
 
 interface MemberRow {
@@ -48,8 +117,17 @@ export default function EventPage() {
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [venueName, setVenueName] = useState('')
+  const [venueAddress, setVenueAddress] = useState('')
+  const [venueCity, setVenueCity] = useState('')
+  const [venueCountry, setVenueCountry] = useState('')
+  const [numClasses, setNumClasses] = useState('')
+  const [expectedParticipants, setExpectedParticipants] = useState('')
+  const [numRaceCourses, setNumRaceCourses] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
   const [infoMsg, setInfoMsg] = useState<string | null>(null)
+  const [arsRate, setArsRate] = useState<OfficialRate | null>(null)
+  const [entrantsCount, setEntrantsCount] = useState<number | null>(null)
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('or')
@@ -62,10 +140,32 @@ export default function EventPage() {
   const isFounder = !!event && event.created_by === userId
   const isEventAdmin = isFounder || isOrgAdmin
 
+  const days = event ? eventDays(event.start_date, event.end_date) : 1
+  const budgetUsd = event ? eventBudgetUsd(days, event.expected_participants ?? 0, event.num_race_courses ?? 0) : 0
+  const daysToStart = event ? daysUntil(event.start_date) : null
+  const showPaymentWarning = !!event && !event.paid && daysToStart !== null && daysToStart <= PAYMENT_WARNING_DAYS
+  const isLocked = !!event && !event.paid && daysToStart !== null && daysToStart <= PAYMENT_LOCK_DAYS
+  const overageCount =
+    event && event.expected_participants != null && entrantsCount != null
+      ? entrantsCount - event.expected_participants
+      : 0
+  const overageUsd = overageCount > 0 ? Math.round(overageCount * 0.3 * days * 100) / 100 : 0
+  const finished = event ? isEventFinished(event.start_date, event.end_date) : false
+  const [lifecycleSaving, setLifecycleSaving] = useState(false)
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (event && !arsRate) {
+      fetchOfficialArsRate().then(setArsRate)
+    }
+  }, [event, arsRate])
+
   const loadEvent = useCallback(async (eventId: string, currentUserId: string) => {
     const { data: eventRow } = await kalai
       .from('events')
-      .select('id, name, description, start_date, end_date, organization_id, created_by, organizations(name)')
+      .select(
+        'id, name, description, start_date, end_date, organization_id, created_by, venue_name, venue_address, venue_city, venue_country, num_classes, expected_participants, num_race_courses, paid, hidden_by_founder, organizations(name)',
+      )
       .eq('id', eventId)
       .maybeSingle()
 
@@ -78,6 +178,13 @@ export default function EventPage() {
     setDescription(typedEvent.description ?? '')
     setStartDate(typedEvent.start_date ?? '')
     setEndDate(typedEvent.end_date ?? '')
+    setVenueName(typedEvent.venue_name ?? '')
+    setVenueAddress(typedEvent.venue_address ?? '')
+    setVenueCity(typedEvent.venue_city ?? '')
+    setVenueCountry(typedEvent.venue_country ?? '')
+    setNumClasses(typedEvent.num_classes != null ? String(typedEvent.num_classes) : '')
+    setExpectedParticipants(typedEvent.expected_participants != null ? String(typedEvent.expected_participants) : '')
+    setNumRaceCourses(typedEvent.num_race_courses != null ? String(typedEvent.num_race_courses) : '')
 
     const { data: founderProfile } = await supabase.from('profiles').select('email').eq('id', typedEvent.created_by).maybeSingle()
     setFounderEmail(founderProfile?.email ?? typedEvent.created_by)
@@ -149,6 +256,13 @@ export default function EventPage() {
         description: description.trim() || null,
         start_date: startDate || null,
         end_date: endDate || null,
+        venue_name: venueName.trim() || null,
+        venue_address: venueAddress.trim() || null,
+        venue_city: venueCity.trim() || null,
+        venue_country: venueCountry.trim() || null,
+        num_classes: numClasses ? Number(numClasses) : null,
+        expected_participants: expectedParticipants ? Number(expectedParticipants) : null,
+        num_race_courses: numRaceCourses ? Number(numRaceCourses) : null,
       })
       .eq('id', event.id)
     setSavingInfo(false)
@@ -237,6 +351,33 @@ export default function EventPage() {
     }
   }
 
+  async function handleDeleteEvent() {
+    if (!event) return
+    if (!window.confirm('¿Borrar este evento definitivamente? No se puede deshacer.')) return
+    setLifecycleError(null)
+    setLifecycleSaving(true)
+    const { error } = await kalai.from('events').delete().eq('id', event.id)
+    setLifecycleSaving(false)
+    if (error) {
+      setLifecycleError(error.message)
+      return
+    }
+    router.push('/')
+  }
+
+  async function handleHideEvent() {
+    if (!event) return
+    setLifecycleError(null)
+    setLifecycleSaving(true)
+    const { error } = await kalai.from('events').update({ hidden_by_founder: true }).eq('id', event.id)
+    setLifecycleSaving(false)
+    if (error) {
+      setLifecycleError(error.message)
+      return
+    }
+    router.push('/')
+  }
+
   if (state === 'loading' || state === 'signedOut') {
     return (
       <div className="page">
@@ -266,6 +407,25 @@ export default function EventPage() {
         </Link>
       </div>
 
+      {isLocked && isEventAdmin && (
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
+          <div style={{ color: 'var(--error)', fontWeight: 700 }}>Evento bloqueado por falta de pago</div>
+          <div className="subtitle">
+            Faltan {PAYMENT_LOCK_DAYS} días o menos para el evento y el pago sigue pendiente — quedó en solo
+            lectura. Escribinos para regularizarlo.
+          </div>
+        </div>
+      )}
+      {!isLocked && showPaymentWarning && isEventAdmin && (
+        <div className="card" style={{ borderColor: '#d97706' }}>
+          <div style={{ color: '#d97706', fontWeight: 700 }}>Pago pendiente</div>
+          <div className="subtitle">
+            Faltan {daysToStart} días para el evento. A los {PAYMENT_LOCK_DAYS} días o menos sin pago, el evento se
+            bloquea. Escribinos para coordinar el pago.
+          </div>
+        </div>
+      )}
+
       <form className="card" onSubmit={handleSaveInfo}>
         <div className="rowBetween">
           <div className="sectionTitle">Información general</div>
@@ -273,28 +433,79 @@ export default function EventPage() {
         </div>
         {isEventAdmin ? (
           <>
-            <div>
-              <div className="label">Nombre</div>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div>
-              <div className="label">Descripción</div>
-              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div className="label">Desde</div>
-                <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <fieldset disabled={isLocked} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div className="label">Nombre</div>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
-              <div style={{ flex: 1 }}>
-                <div className="label">Hasta</div>
-                <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <div>
+                <div className="label">Descripción</div>
+                <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
-            </div>
-            {infoMsg && <div className="success">{infoMsg}</div>}
-            <button className="button" type="submit" disabled={savingInfo}>
-              {savingInfo ? 'Guardando…' : 'Guardar'}
-            </button>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Desde</div>
+                  <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Hasta</div>
+                  <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="sectionTitle">Sede</div>
+              <div>
+                <div className="label">Club / lugar</div>
+                <input className="input" value={venueName} onChange={(e) => setVenueName(e.target.value)} />
+              </div>
+              <div>
+                <div className="label">Dirección</div>
+                <input className="input" value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Ciudad</div>
+                  <input className="input" value={venueCity} onChange={(e) => setVenueCity(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="label">País</div>
+                  <input className="input" value={venueCountry} onChange={(e) => setVenueCountry(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="sectionTitle">Escala del evento</div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Clases</div>
+                  <input className="input" type="number" min="0" value={numClasses} onChange={(e) => setNumClasses(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Participantes estimados</div>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    value={expectedParticipants}
+                    onChange={(e) => setExpectedParticipants(e.target.value)}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="label">Canchas de regata</div>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    value={numRaceCourses}
+                    onChange={(e) => setNumRaceCourses(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {infoMsg && <div className="success">{infoMsg}</div>}
+              <button className="button" type="submit" disabled={savingInfo}>
+                {savingInfo ? 'Guardando…' : 'Guardar'}
+              </button>
+            </fieldset>
           </>
         ) : (
           <>
@@ -305,9 +516,56 @@ export default function EventPage() {
                 {event.start_date ?? '?'} — {event.end_date ?? '?'}
               </div>
             )}
+            {event.venue_name && (
+              <div className="subtitle">
+                {event.venue_name}
+                {event.venue_city ? `, ${event.venue_city}` : ''}
+              </div>
+            )}
           </>
         )}
       </form>
+
+      {isEventAdmin && (
+        <div className="card">
+          <div className="sectionTitle">Presupuesto y pago</div>
+          <div className="subtitle">
+            {days} día{days === 1 ? '' : 's'} · USD 0.3/participante/día + USD 5/cancha/día
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 700 }}>
+            USD {budgetUsd.toLocaleString('es-AR')}
+            {arsRate && (
+              <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--muted)' }}>
+                {' '}
+                ≈ ARS {Math.round(budgetUsd * arsRate.venta).toLocaleString('es-AR')} (oficial hoy)
+              </span>
+            )}
+          </div>
+          <div className="memberRow" style={{ borderBottom: 'none', paddingTop: 4 }}>
+            <span>Estado</span>
+            <span className="badge" style={event.paid ? {} : { background: '#fef3c7', color: '#92400e' }}>
+              {event.paid ? 'Pagado' : 'Pendiente de pago'}
+            </span>
+          </div>
+          {!event.paid && isEventAdmin && (
+            <a
+              className="button"
+              style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}
+              href={`${process.env.NEXT_PUBLIC_COACH_DATA_WEB_URL ?? 'https://app.kalai.com.ar'}/evento-pago/${event.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Pagar ahora
+            </a>
+          )}
+          {overageCount > 0 && (
+            <div style={{ background: '#fef3c7', borderRadius: 10, padding: 16, fontSize: 14, color: '#92400e' }}>
+              Tenés {entrantsCount} participantes cargados, {overageCount} más de los {event.expected_participants}{' '}
+              pagados. Diferencia estimada: USD {overageUsd.toLocaleString('es-AR')}.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="sectionTitle">Miembros</div>
@@ -405,7 +663,7 @@ export default function EventPage() {
           </>
         )}
 
-        {isEventAdmin && (
+        {isEventAdmin && !isLocked && (
           <form onSubmit={handleInvite} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
             <div className="sectionTitle">Invitar miembro</div>
             <div>
@@ -443,27 +701,47 @@ export default function EventPage() {
         </div>
       </div>
 
-      <div className="card" style={{ opacity: 0.5 }}>
-        <div className="rowBetween">
-          <div className="sectionTitle">Entrenadores</div>
-          <span className="badge">Próximamente</span>
-        </div>
-        <div className="subtitle">
-          Listado de entrenadores con ficha médica, contacto, clase, club y chicos a cargo — depende del schema de
-          inscriptos de Regatta RC (bloqueado por el CSV real del club).
-        </div>
-      </div>
+      {(isEventAdmin || !!members?.length) && userId && (
+        <>
+          <RosterSection
+            title="Participantes"
+            table="event_entrants"
+            eventId={event.id}
+            userId={userId}
+            canEdit={isEventAdmin || members?.some((m) => m.user_id === userId && m.role === 'secretario') || false}
+            locked={isLocked}
+            fields={PARTICIPANT_FIELDS}
+            aliases={PARTICIPANT_ALIASES}
+            emptyMessage="Todavía no hay participantes cargados."
+            onCountChange={setEntrantsCount}
+          />
 
-      <div className="card" style={{ opacity: 0.5 }}>
-        <div className="rowBetween">
-          <div className="sectionTitle">Participantes</div>
-          <span className="badge">Próximamente</span>
-        </div>
-        <div className="subtitle">
-          Listado de participantes con contacto, club, clase, edad y ficha médica — depende del schema de inscriptos
-          de Regatta RC (bloqueado por el CSV real del club).
-        </div>
-      </div>
+          <RosterSection
+            title="Entrenadores"
+            table="event_coaches"
+            eventId={event.id}
+            userId={userId}
+            canEdit={isEventAdmin || members?.some((m) => m.user_id === userId && m.role === 'secretario') || false}
+            locked={isLocked}
+            fields={COACH_FIELDS}
+            aliases={COACH_ALIASES}
+            emptyMessage="Todavía no hay entrenadores cargados."
+          />
+        </>
+      )}
+
+      {isEventAdmin && (
+        <RaceCoursesSection
+          eventId={event.id}
+          eventName={event.name}
+          venueName={event.venue_name}
+          startDate={event.start_date}
+          endDate={event.end_date}
+          numRaceCourses={event.num_race_courses}
+          canEdit={isEventAdmin}
+          locked={isLocked}
+        />
+      )}
 
       <div className="card" style={{ opacity: 0.5 }}>
         <div className="rowBetween">
@@ -480,6 +758,52 @@ export default function EventPage() {
         </div>
         <div className="subtitle">Listado de botes, boyas y lanchas del evento.</div>
       </div>
+
+      {isFounder && (
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
+          <div className="sectionTitle" style={{ color: 'var(--error)' }}>
+            Zona de peligro
+          </div>
+          {finished ? (
+            <>
+              <div className="subtitle">Este evento ya finalizó. Se puede borrar en forma definitiva.</div>
+              {lifecycleError && <div className="error">{lifecycleError}</div>}
+              <button
+                className="button"
+                style={{ background: 'var(--error)' }}
+                onClick={handleDeleteEvent}
+                disabled={lifecycleSaving}
+              >
+                {lifecycleSaving ? 'Borrando…' : 'Borrar definitivamente'}
+              </button>
+            </>
+          ) : event.paid ? (
+            <>
+              <div className="subtitle">
+                Este evento ya está pago — no se puede borrar mientras esté vigente. Lo podés sacar de tu listado
+                (sigue existiendo normal para el resto de los miembros) y se borra solo cuando finalice.
+              </div>
+              {lifecycleError && <div className="error">{lifecycleError}</div>}
+              <button className="button buttonSecondary" onClick={handleHideEvent} disabled={lifecycleSaving}>
+                {lifecycleSaving ? 'Ocultando…' : 'Ocultar de mi listado'}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="subtitle">Este evento todavía no está pago — se puede borrar en cualquier momento.</div>
+              {lifecycleError && <div className="error">{lifecycleError}</div>}
+              <button
+                className="button"
+                style={{ background: 'var(--error)' }}
+                onClick={handleDeleteEvent}
+                disabled={lifecycleSaving}
+              >
+                {lifecycleSaving ? 'Borrando…' : 'Borrar evento'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

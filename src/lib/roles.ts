@@ -15,10 +15,15 @@ export const INVITABLE_ROLES = ['coach', 'head_coach', 'coordinador', 'acreditad
 // Roles de evento — distintos de los de organización (event_memberships,
 // no organization_members). "Acreditador" existe en los dos niveles, se
 // distingue por dónde se invita, no por el texto del rol (ver
-// accept_invitation en 023).
+// accept_invitation en 023). "Admin" y "Secretario" agregados en 026:
+// admin delegado tiene los mismos permisos que el fundador; secretario
+// puede gestionar participantes/entrenadores pero no info general ni
+// miembros (ver policies de event_entrants/event_coaches).
 export const EVENT_ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
   or: 'Oficial de Regata',
+  secretario: 'Secretario',
   acreditador: 'Acreditador',
 }
 
-export const EVENT_INVITABLE_ROLES = ['or', 'acreditador']
+export const EVENT_INVITABLE_ROLES = ['admin', 'or', 'secretario', 'acreditador']
