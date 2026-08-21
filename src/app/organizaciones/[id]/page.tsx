@@ -300,7 +300,7 @@ export default function OrganizationPage() {
         <div className="card">
           <div className="error">No pertenecés a esta organización, o no existe.</div>
         </div>
-        <Link className="link" href="/">
+        <Link className="link" href="/cuenta">
           ← Volver a mi cuenta
         </Link>
       </div>
@@ -310,7 +310,7 @@ export default function OrganizationPage() {
   return (
     <div className="page">
       <div className="rowBetween">
-        <Link className="link" href="/">
+        <Link className="link" href="/cuenta">
           ← Mi cuenta
         </Link>
       </div>

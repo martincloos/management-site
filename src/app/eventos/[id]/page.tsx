@@ -362,7 +362,7 @@ export default function EventPage() {
       setLifecycleError(error.message)
       return
     }
-    router.push('/')
+    router.push('/cuenta')
   }
 
   async function handleHideEvent() {
@@ -375,7 +375,7 @@ export default function EventPage() {
       setLifecycleError(error.message)
       return
     }
-    router.push('/')
+    router.push('/cuenta')
   }
 
   if (state === 'loading' || state === 'signedOut') {
@@ -392,7 +392,7 @@ export default function EventPage() {
         <div className="card">
           <div className="error">No pertenecés a este evento, o no existe.</div>
         </div>
-        <Link className="link" href="/">
+        <Link className="link" href="/cuenta">
           ← Volver a mi cuenta
         </Link>
       </div>
@@ -402,7 +402,7 @@ export default function EventPage() {
   return (
     <div className="page">
       <div className="rowBetween">
-        <Link className="link" href="/">
+        <Link className="link" href="/cuenta">
           ← Mi cuenta
         </Link>
       </div>
