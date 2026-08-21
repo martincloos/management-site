@@ -76,6 +76,7 @@ export default function LandingPage() {
         <div className="landingFooterLinks">
           <Link href="/terminos" className="link">Términos y condiciones</Link>
           <Link href="/privacidad" className="link">Política de privacidad</Link>
+          <Link href="/eliminar-cuenta" className="link">Eliminar mi cuenta</Link>
           <a href="mailto:info@kalai.com.ar" className="link">info@kalai.com.ar</a>
         </div>
       </footer>
