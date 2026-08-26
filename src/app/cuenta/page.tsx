@@ -711,14 +711,23 @@ export default function PersonalPage() {
         </form>
       </div>
 
-      <div className="card" style={{ opacity: 0.5 }}>
+      <div className="card">
         <div className="rowBetween">
           <div className="sectionTitle">Análisis</div>
-          <span className="badge">Próximamente</span>
         </div>
         <div className="subtitle">
-          Vas a poder ver mapas y reportes de tus sesiones acá{!pro && ' — disponible solo con Coach Data Pro'}.
+          Mapa y línea de tiempo de tus sesiones: viento, corriente, recorrido y laylines
+          {!pro && ' — disponible solo con Coach Data Pro'}.
         </div>
+        <a
+          className="button"
+          style={{ textAlign: 'center', textDecoration: 'none', display: 'block', marginTop: 12 }}
+          href={process.env.NEXT_PUBLIC_ANALISIS_APP_URL ?? 'https://analysis.kalai.com.ar'}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Abrir Análisis
+        </a>
       </div>
     </div>
   )
