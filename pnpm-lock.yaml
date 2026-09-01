@@ -12,8 +12,8 @@ importers:
         specifier: ^2.44.4
         version: 2.112.3
       kalai-checkin:
-        specifier: git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf
-        version: git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf(@supabase/supabase-js@2.112.3)(react@19.2.3)
+        specifier: git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf
+        version: git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf(@supabase/supabase-js@2.112.3)(react@19.2.3)
       next:
         specifier: 16.3.0
         version: 16.3.0(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@20.19.43)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1375,8 +1375,8 @@ packages:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
     engines: {node: '>=4.0'}
 
-  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf:
-    resolution: {commit: fd3c9bd9e385660e785a8e232b1a7d46eb66edbf, repo: https://github.com/fgentile123/kalai-checkin.git, type: git}
+  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf:
+    resolution: {commit: cbef3fe390df48850037569b336d1a002dc3b8cf, repo: https://github.com/fgentile123/kalai-checkin.git, type: git}
     version: 0.1.0
     peerDependencies:
       '@supabase/supabase-js': ^2
@@ -3321,7 +3321,7 @@ snapshots:
       object.assign: 4.1.7
       object.values: 1.2.1
 
-  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf(@supabase/supabase-js@2.112.3)(react@19.2.3):
+  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf(@supabase/supabase-js@2.112.3)(react@19.2.3):
     dependencies:
       '@supabase/supabase-js': 2.112.3
     optionalDependencies:

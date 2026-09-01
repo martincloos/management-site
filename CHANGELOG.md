@@ -12,7 +12,7 @@ decisiones propias de esta app (código, deploy, diseño).
 ## 2026-09-01 — Integra la pantalla de Ventanas de check-in (Fase 2)
 
 - **Qué se hizo**: se agrega `kalai-checkin` como dependencia git pineada a
-  un SHA (`git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd...`,
+  un SHA (`git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe...`,
   mismo mecanismo que `kalai-ui` en `coach-data`) y se renderiza
   `<VentanasSection>` (de `kalai-checkin/staff`) en
   `eventos/[id]/page.tsx`, después de las secciones de Participantes y
@@ -31,11 +31,23 @@ decisiones propias de esta app (código, deploy, diseño).
   `pnpm typecheck`/`pnpm build` con `ERR_PNPM_IGNORED_BUILDS`) — se fijó en
   `false`, es un resolver de tooling de ESLint, no hace falta su build
   nativo.
-- **Verificado**: `pnpm typecheck` y `pnpm build` (Next.js/Turbopack)
-  compilan limpio con la nueva pantalla. El build completo del sitio falla
-  en esta máquina por falta de `.env.local` (no hay credenciales de
-  Supabase configuradas acá) — no relacionado con este cambio.
-  **Sin probar en el navegador todavía.**
+- **Verificado en el navegador real (Playwright headless)**: signup de una
+  cuenta de prueba (`claude-smoke-test-*@example.com`, el proyecto no exige
+  confirmación de email), creación de un evento descartable, y ciclo
+  completo dentro de la tarjeta de Ventanas — dar de alta una clase, crear
+  una ventana (aparece con badge "Abierta" bien calculado), editar su hora
+  de fin, y borrarla. Cero errores de consola en todo el recorrido. Se
+  encontró y corrigió al probar: `createCheckinWindow` no mandaba
+  `created_by`, quedaba `null` (columna nullable, no rompía nada, pero el
+  módulo existe justamente para trazabilidad — ver fix en el CHANGELOG de
+  `kalai-checkin`). Cuenta y evento de prueba borrados al terminar — no
+  queda nada en la base real salvo la cuenta de auth huérfana
+  (`claude-smoke-test-*@example.com`, sin organización ni evento
+  asociado, inofensiva).
+- `pnpm typecheck` y `pnpm build` (Next.js/Turbopack) compilan limpio. El
+  build completo del sitio falla en esta máquina por falta de otras
+  variables de entorno (Mercado Pago, Regatta CR) no relacionadas con este
+  cambio.
 
 ---
 

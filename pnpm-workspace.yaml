@@ -7,4 +7,4 @@ allowBuilds:
   # compilar (ver prepare en su package.json) — mismo patrón que kalai-ui
   # en coach-data. Para dependencias git hay que usar la clave completa
   # (nombre@spec), no alcanza con el nombre solo.
-  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf: true
+  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf: true
