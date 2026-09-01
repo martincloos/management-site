@@ -9,6 +9,22 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-09-01 — Deploy en Vercel: caché de dependencias corrupta
+
+- **Qué pasó**: los primeros 3 deploys del commit `b385583` fallaron con
+  `ERR_PNPM_INVALID_VERSION_UNION` sobre `kalai-checkin`, incluso con
+  "Use existing Build Cache" destildado en la UI de Vercel — el log seguía
+  mostrando el mismo `Restored build cache from previous deployment
+  (BvGVSVmT25YVx2V1yCY2u283W1wX)` en los tres casos.
+- **Verificado que NO es un problema del repo**: se instaló el lockfile de
+  ese commit exacto dos veces en aislamiento total (clon nuevo +
+  `--store-dir` vacío, sin nada de la máquina de por medio) con
+  `pnpm@10.34.5 --frozen-lockfile` — las dos veces funcionó limpio.
+- **Este commit es la prueba**: un commit genuinamente nuevo (no un
+  "Redeploy" de uno que ya falló) para ver si Vercel arranca una cadena de
+  build distinta, sin la caché envenenada asociada a esa lista de
+  deployments.
+
 ## 2026-09-01 — Integra la pantalla de Ventanas de check-in (Fase 2)
 
 - **Qué se hizo**: se agrega `kalai-checkin` como dependencia git pineada a
