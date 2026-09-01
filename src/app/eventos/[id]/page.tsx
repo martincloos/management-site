@@ -17,6 +17,7 @@ import {
 } from '@/lib/budget'
 import RosterSection from '@/components/RosterSection'
 import RaceCoursesSection from '@/components/RaceCoursesSection'
+import { VentanasSection } from 'kalai-checkin/staff'
 
 interface EventRow {
   id: string
@@ -139,6 +140,10 @@ export default function EventPage() {
 
   const isFounder = !!event && event.created_by === userId
   const isEventAdmin = isFounder || isOrgAdmin
+  // Staff del check-in por decisión D4 del relevamiento: admin + secretario
+  // + acreditador (no solo admin+secretario como el resto del roster).
+  const isCheckinStaff =
+    isEventAdmin || members?.some((m) => m.user_id === userId && ['secretario', 'acreditador'].includes(m.role)) || false
 
   const days = event ? eventDays(event.start_date, event.end_date) : 1
   const budgetUsd = event ? eventBudgetUsd(days, event.expected_participants ?? 0, event.num_race_courses ?? 0) : 0
@@ -726,6 +731,14 @@ export default function EventPage() {
             fields={COACH_FIELDS}
             aliases={COACH_ALIASES}
             emptyMessage="Todavía no hay entrenadores cargados."
+          />
+
+          <VentanasSection
+            supabase={supabase}
+            eventId={event.id}
+            userId={userId}
+            canEdit={isCheckinStaff}
+            locked={isLocked}
           />
         </>
       )}

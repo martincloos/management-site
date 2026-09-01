@@ -55,12 +55,16 @@ pnpm typecheck
 (link para copiar y mandar a mano — sin envío automático de mail
 todavía), aceptar invitación.
 
+**Ya no está fuera de alcance**: el módulo de check-in (`event_entrants`,
+`checkin_windows`, etc. — schema `kalai` en `coach-data`, no en Regatta RC)
+arrancó el 2026-08-26 y su pantalla de staff (Fase 2, ventanas) ya se
+integró acá vía el paquete `kalai-checkin` (ver CHANGELOG). Sigue
+bloqueado por un CSV real de inscriptos del club para las fases de import
+(Fase 5).
+
 **Explícitamente fuera de alcance por ahora** (no construir sin que el
-usuario lo pida): eventos/acreditación/check-in (depende de schema que
-todavía no existe en Regatta RC — `event_entrants`, `checkin_windows` —
-bloqueado por un CSV real de inscriptos del club), entitlements/billing
-por organización, envío de mail transaccional para invitaciones, páginas
-de marketing (quiénes somos/precios/fotos).
+usuario lo pida): entitlements/billing por organización, envío de mail
+transaccional para invitaciones, páginas de marketing (quiénes somos/precios/fotos).
 
 ## Seguridad
 

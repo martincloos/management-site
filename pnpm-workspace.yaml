@@ -1,2 +1,10 @@
 allowBuilds:
-  unrs-resolver: set this to true or false
+  # Resolver usado por tooling de ESLint; no hace falta su build nativo
+  # para nada de lo que usa este repo. Quedaba como TODO sin resolver.
+  unrs-resolver: false
+  # kalai-checkin es paquete propio (repo privado en GitHub); necesita
+  # correr "tsc" al instalarse porque se distribuye como fuente TS sin
+  # compilar (ver prepare en su package.json) — mismo patrón que kalai-ui
+  # en coach-data. Para dependencias git hay que usar la clave completa
+  # (nombre@spec), no alcanza con el nombre solo.
+  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd9e385660e785a8e232b1a7d46eb66edbf: true

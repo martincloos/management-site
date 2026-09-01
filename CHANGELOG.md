@@ -9,6 +9,68 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-09-01 — Integra la pantalla de Ventanas de check-in (Fase 2)
+
+- **Qué se hizo**: se agrega `kalai-checkin` como dependencia git pineada a
+  un SHA (`git+https://github.com/fgentile123/kalai-checkin.git#fd3c9bd...`,
+  mismo mecanismo que `kalai-ui` en `coach-data`) y se renderiza
+  `<VentanasSection>` (de `kalai-checkin/staff`) en
+  `eventos/[id]/page.tsx`, después de las secciones de Participantes y
+  Entrenadores. Permite al staff dar de alta clases del evento a mano y
+  crear/editar/borrar ventanas de check-in (Salida/Regreso por clase y
+  día).
+- **`allowBuilds` en `pnpm-workspace.yaml`**: el paquete se distribuye como
+  fuente TS sin compilar y corre `tsc` al instalarse — hace falta declarar
+  la clave completa `kalai-checkin@git+https://...#sha: true` (no alcanza
+  con el nombre solo, a diferencia de las dependencias del registry).
+- **`canEdit` del check-in usa su propio criterio de staff** (decisión D4):
+  admin + secretario + acreditador, no `{admin, secretario}` como el resto
+  del roster — el acreditador no gestiona roster pero sí ventanas.
+- **De paso**: se resolvió un `allowBuilds: unrs-resolver` que había
+  quedado como TODO sin definir en `pnpm-workspace.yaml` (bloqueaba
+  `pnpm typecheck`/`pnpm build` con `ERR_PNPM_IGNORED_BUILDS`) — se fijó en
+  `false`, es un resolver de tooling de ESLint, no hace falta su build
+  nativo.
+- **Verificado**: `pnpm typecheck` y `pnpm build` (Next.js/Turbopack)
+  compilan limpio con la nueva pantalla. El build completo del sitio falla
+  en esta máquina por falta de `.env.local` (no hay credenciales de
+  Supabase configuradas acá) — no relacionado con este cambio.
+  **Sin probar en el navegador todavía.**
+
+---
+
+## 2026-08-26 — Módulo de check-in: impacto pendiente sobre este sitio
+
+Todavía **no hay cambios de código acá** — esta entrada registra lo que
+viene, porque el módulo de check-in (repo nuevo `kalai-checkin`, schema en
+las migraciones `035`–`038` de Coach Data, originalmente escritas como
+`029`–`032` y renumeradas por una colisión con otro trabajo — ver
+CHANGELOG de `coach-data`) cambia cosas que este sitio ya usa. Ver
+`../CHECKIN-FASE0-RELEVAMIENTO.md` para el detalle.
+
+- **`kalai.event_entrants` pasó a ser "una fila por BARCO"** (antes: una
+  fila por persona). La migración `035` es aditiva — no borra ninguna
+  columna, así que `RosterSection.tsx` sigue leyendo `full_name`, `class` y
+  `club` como antes y **no se rompe**. Pero las columnas nuevas
+  (`class_id`, `club_id`) quedan vacías en todo lo que se cargue desde acá
+  hasta que se adapte el importador (Fase 5 del plan de check-in), y un
+  barco sin `class_id` no puede aparecer en ninguna ventana de check-in.
+- ⚠️ **La RLS de `event_entrants` y `event_coaches` se endureció**
+  (migración `036`). Antes, cualquier miembro del evento leía el roster
+  completo; ahora la vista global es exclusiva del staff (admin /
+  secretario / acreditador) y quien solo declara ve únicamente sus barcos.
+  Efecto para este sitio: **un usuario con rol `or` (Oficial de Regata)
+  deja de ver las secciones de Participantes y Entrenadores** del evento.
+  Es intencional.
+- **La escritura del roster se amplió** de `{admin, secretario}` a los tres
+  roles de staff — el acreditador ahora también puede cargar y corregir.
+- **Lo que va a vivir acá**: las pantallas de staff del módulo
+  (configuración de ventanas, import de CSV, asignación entrenador↔barco y
+  la tabla de control) se renderizan **dentro de este sitio**, consumidas
+  desde el paquete `kalai-checkin` — para no tener dos webapps de staff con
+  dos logins. También va acá la ruta de servidor del invite de altas, que
+  es la única que necesita la service-role key.
+
 ## 2026-08-19 — Corrección: el webhook de Regatta RC Pro se muda al proyecto de Regatta RC
 
 - **Qué se hizo**: se borran `src/lib/regattaAdmin.ts` y
