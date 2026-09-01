@@ -1,11 +1,15 @@
 # Management site — Contexto del proyecto
 
-Webapp de gestión de Kalai Analytics — hoy solo organización + entrenadores
-(crear organización, invitar por email, aceptar invitación). A futuro va a
-ser la puerta de entrada pública a todo Kalai Analytics (quiénes somos, qué
-hacemos, precios) — el diseño (blanco, simple, profesional, moderno) está
-pensado para aguantar ese crecimiento sin rehacerse. Ver
-`../KALAI-ANALYTICS.md` y `../ROADMAP.md` (Track B) para el contexto de
+Webapp de gestión de Kalai Analytics. Desde 2026-08-20, `analytics.kalai.com.ar`
+es la **puerta de entrada pública única** de Kalai Analytics: `/` es una
+landing pública (quiénes somos, qué hacemos, precios) con botón chico de
+"Iniciar sesión" arriba a la derecha — no gatea todo el sitio al login. El
+hub de cuenta (suscripciones de Coach Data y Regatta RC, organizaciones,
+eventos) vive en **`/cuenta`**, atrás del login. `/terminos` y `/privacidad`
+son legales unificados para los dos productos (antes vivían solo en
+`app.kalai.com.ar`, el sitio de Coach Data). El diseño (blanco, simple,
+profesional, moderno) fue pensado desde el principio para este crecimiento.
+Ver `../KALAI-ANALYTICS.md` y `../ROADMAP.md` (Track B) para el contexto de
 negocio completo.
 
 ## Antes de empezar a trabajar

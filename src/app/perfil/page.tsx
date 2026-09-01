@@ -116,7 +116,7 @@ export default function PerfilPage() {
   return (
     <div className="page">
       <div className="rowBetween">
-        <Link className="link" href="/">
+        <Link className="link" href="/cuenta">
           ← Mi cuenta
         </Link>
       </div>

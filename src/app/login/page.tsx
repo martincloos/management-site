@@ -25,7 +25,7 @@ export default function LoginPage() {
         setErrorMsg(error.message)
         return
       }
-      router.push('/')
+      router.push('/cuenta')
       return
     }
 
@@ -39,7 +39,7 @@ export default function LoginPage() {
       setCheckEmailMsg('Revisá tu email para confirmar la cuenta.')
       return
     }
-    router.push('/')
+    router.push('/cuenta')
   }
 
   return (
