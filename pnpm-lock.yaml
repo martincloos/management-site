@@ -12,8 +12,8 @@ importers:
         specifier: ^2.44.4
         version: 2.112.3
       kalai-checkin:
-        specifier: git+https://github.com/martincloos/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf
-        version: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cbef3fe390df48850037569b336d1a002dc3b8cf(@supabase/supabase-js@2.112.3)(react@19.2.3)
+        specifier: git+https://github.com/martincloos/kalai-checkin.git#5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a
+        version: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a(@supabase/supabase-js@2.112.3)(react@19.2.3)
       next:
         specifier: 16.3.0
         version: 16.3.0(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1375,14 +1375,20 @@ packages:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
     engines: {node: '>=4.0'}
 
-  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cbef3fe390df48850037569b336d1a002dc3b8cf:
-    resolution: {gitHosted: true, integrity: sha512-VNWbjXJVBKKlBvDsnzMrVt0u8SPTMk40UfddsaTUGTTqsb9WCWTSxYEQlbceoKt2Bk5pAXkBogKxtzT2wM2dzg==, tarball: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cbef3fe390df48850037569b336d1a002dc3b8cf}
+  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a:
+    resolution: {gitHosted: true, integrity: sha512-6rgpB7c1mVFKUDJKpzgrde2UF0a4HJclWxC4UiOtt77eiUIYerLVC5okIKLZ3AcpEMm7Abv2kJMr7tBBiJZqog==, tarball: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a}
     version: 0.1.0
     peerDependencies:
       '@supabase/supabase-js': ^2
+      kalai-ui: '*'
       react: '*'
+      react-native: '*'
     peerDependenciesMeta:
+      kalai-ui:
+        optional: true
       react:
+        optional: true
+      react-native:
         optional: true
 
   keyv@4.5.4:
@@ -3317,7 +3323,7 @@ snapshots:
       object.assign: 4.1.7
       object.values: 1.2.1
 
-  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cbef3fe390df48850037569b336d1a002dc3b8cf(@supabase/supabase-js@2.112.3)(react@19.2.3):
+  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a(@supabase/supabase-js@2.112.3)(react@19.2.3):
     dependencies:
       '@supabase/supabase-js': 2.112.3
     optionalDependencies:

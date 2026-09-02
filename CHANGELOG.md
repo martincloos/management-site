@@ -9,6 +9,51 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-09-02 — Deploy: causa raíz encontrada (recursión del `prepare`), resuelta
+
+El deploy del commit `a470599` ya **no** falló con
+`ERR_PNPM_INVALID_VERSION_UNION` — ese arreglo funcionó. Falló con el
+problema que estaba tapado detrás, y su log lo muestra entero.
+
+- **Qué pasa**: Vercel ubica el store de pnpm **dentro del proyecto**
+  (`Content-addressable store is at: /vercel/path0/.pnpm-store/v10`). El
+  script `prepare` de `kalai-checkin` corre un `pnpm install` en un
+  directorio temporal de ese store — o sea, dentro de este repo. Ese
+  install camina hacia arriba buscando raíz de proyecto, encuentra la de
+  `management-site`, y **reinstala este sitio entero**, lo que vuelve a
+  preparar `kalai-checkin`, que vuelve a correr `pnpm install`…
+- **Cómo se ve en el log**: nueve niveles de `pnpm install` anidados
+  (`_98`, `_111`, `_124`, `_137`, `_150`, `_163`, `_176`, `_189`, `_202`,
+  `_215`), **349 paquetes resueltos por nivel** — que son los de este
+  sitio, no los del paquete. Termina cuando dos ramas paralelas escriben
+  el mismo archivo del virtual store y saltan dos `ERR_PNPM_EEXIST`
+  seguidos, luego `ERR_PNPM_PREPARE_PACKAGE`.
+- **Por qué nunca se reprodujo localmente**: en una máquina de desarrollo
+  el store de pnpm vive fuera del proyecto (en el perfil del usuario), así
+  que el install anidado no encuentra ninguna raíz de la que colgarse y
+  termina en segundos. Es un problema exclusivo de cómo Vercel configura
+  el store.
+- **Y por qué el equipo lo leyó como "caché corrupta"**: los reintentos
+  con la caché destildada seguían fallando porque la causa nunca fue la
+  caché — era determinística, y se disparaba en todo deploy que tuviera
+  que preparar el paquete.
+- **Arreglo**: `kalai-checkin` deja de compilarse al instalarse. Ahora
+  publica `dist/` ya compilado y **no tiene script `prepare`** (ver su
+  CHANGELOG). Este repo lo consume pineado al SHA `5cb1b4e` y se le sacó
+  la entrada de `allowBuilds`: el paquete no ejecuta nada al instalarse,
+  así que no necesita permiso de build.
+- **Efecto de yapa**: la mitad declarante del paquete es React Native. Con
+  el `prepare` puesto, este sitio web habría tenido que instalar React
+  Native (y `kalai-ui`, otra dependencia git con su propio `prepare`) en
+  cada deploy solo para compilar un componente que nunca importa. Ya no.
+- **El pin `packageManager` queda**, aunque ya no es imprescindible: sin
+  la clave `nombre@URL` en `allowBuilds` desaparece el bug de parseo de
+  pnpm 10.2x. Se mantiene por reproducibilidad del build.
+- **Verificado local**: install con `node_modules/kalai-checkin` borrado
+  baja el paquete ya compilado en **6,6 s** sin ejecutar ningún script y
+  sin traer React Native; `--frozen-lockfile` en sync; `pnpm typecheck` y
+  `pnpm build` limpios.
+
 ## 2026-09-02 — Deploy: diagnóstico real del ERR_PNPM_INVALID_VERSION_UNION
 
 ⚠️ **Esta entrada corrige la del 2026-09-01 de abajo ("caché de
