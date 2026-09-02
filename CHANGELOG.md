@@ -9,6 +9,37 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
+## 2026-09-02 — Asignación de barcos a declarantes (check-in, Fase 3)
+
+- **Qué se agregó**: `<AsignacionSection>` (de `kalai-checkin/staff`,
+  pineado al SHA `cdfa7c8`) en `eventos/[id]/page.tsx`, arriba de Ventanas.
+  Se elige una persona y se marcan sus barcos con checkboxes, con filtro
+  por clase y búsqueda por nombre o número de vela. El caso real es un
+  entrenador con diez o quince barcos de una misma clase, de ahí
+  "Seleccionar los visibles".
+- **Por qué era urgente**: sin una asignación en `kalai.entrant_declarants`
+  **el banner del declarante no le aparece a nadie**, así que no había forma
+  de probar la pantalla de Coach Data. Era el prerequisito real.
+- **Lista miembros del evento, no el roster de Entrenadores** —
+  `entrant_declarants.user_id` apunta a una **cuenta real**
+  (`public.profiles`), y una fila de `event_coaches` es texto libre con
+  email, sin usuario detrás hasta que la persona acepta su invitación. La
+  pantalla lo dice explícitamente porque es la confusión obvia.
+- **Avisa de dos errores que si no serían silenciosos**: cuántos barcos
+  quedaron **sin ningún declarante** (nadie los va a declarar el día del
+  evento), y cuántos **no tienen clase asignada** (un barco sin `class_id`
+  no aparece en ninguna ventana aunque tenga declarante — lo arregla la
+  migración `039` de `coach-data`).
+- **Quitar una asignación no es destructivo**: `entrant_declarants` no es el
+  log append-only (ese es `checkin_events`), y las declaraciones ya emitidas
+  por esa persona quedan intactas con su autoría.
+- **Permisos**: `canEdit={isCheckinStaff}` — admin + secretario +
+  acreditador, misma decisión D4 que Ventanas. La RLS de `036` ya lo exige
+  del lado de la base; el `canEdit` solo evita mostrar controles inertes.
+- **Verificado**: `pnpm typecheck` y `pnpm build` limpios. ⚠️ **Sin probar
+  en navegador**: esta máquina no tiene `.env.local`, así que no se puede
+  levantar el sitio contra la base real.
+
 ## 2026-09-02 — Deploy: causa raíz encontrada (recursión del `prepare`), resuelta
 
 El deploy del commit `a470599` ya **no** falló con

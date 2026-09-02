@@ -17,7 +17,7 @@ import {
 } from '@/lib/budget'
 import RosterSection from '@/components/RosterSection'
 import RaceCoursesSection from '@/components/RaceCoursesSection'
-import { VentanasSection } from 'kalai-checkin/staff'
+import { AsignacionSection, VentanasSection } from 'kalai-checkin/staff'
 
 interface EventRow {
   id: string
@@ -731,6 +731,14 @@ export default function EventPage() {
             fields={COACH_FIELDS}
             aliases={COACH_ALIASES}
             emptyMessage="Todavía no hay entrenadores cargados."
+          />
+
+          <AsignacionSection
+            supabase={supabase}
+            eventId={event.id}
+            userId={userId}
+            canEdit={isCheckinStaff}
+            locked={isLocked}
           />
 
           <VentanasSection

@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.44.4",
-    "kalai-checkin": "git+https://github.com/martincloos/kalai-checkin.git#5cb1b4e4f1ffc5396c61fcbcc166ec798fbc6f0a",
+    "kalai-checkin": "git+https://github.com/martincloos/kalai-checkin.git#cdfa7c81ddbb548584c9c6e65d8e3614b753742a",
     "next": "16.3.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
