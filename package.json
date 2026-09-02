@@ -2,6 +2,7 @@
   "name": "management-site",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.44.4",
-    "kalai-checkin": "git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf",
+    "kalai-checkin": "git+https://github.com/martincloos/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf",
     "next": "16.3.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"

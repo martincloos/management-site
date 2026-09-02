@@ -2,9 +2,16 @@ allowBuilds:
   # Resolver usado por tooling de ESLint; no hace falta su build nativo
   # para nada de lo que usa este repo. Quedaba como TODO sin resolver.
   unrs-resolver: false
-  # kalai-checkin es paquete propio (repo privado en GitHub); necesita
-  # correr "tsc" al instalarse porque se distribuye como fuente TS sin
-  # compilar (ver prepare en su package.json) — mismo patrón que kalai-ui
-  # en coach-data. Para dependencias git hay que usar la clave completa
-  # (nombre@spec), no alcanza con el nombre solo.
-  kalai-checkin@git+https://github.com/fgentile123/kalai-checkin.git#cbef3fe390df48850037569b336d1a002dc3b8cf: true
+  # kalai-checkin se distribuye como fuente TS sin compilar y corre "tsc"
+  # al instalarse (ver prepare en su package.json), así que necesita
+  # permiso explícito para ejecutar build scripts.
+  # Para dependencias git hay que usar la clave completa (nombre@spec):
+  # con el nombre solo, pnpm 10.34.5 falla con
+  # ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED.
+  # ⚠ Esta clave es la razón por la que "packageManager" está fijo en
+  # package.json y NO se puede sacar: pnpm 10.2x no sabe parsearla y
+  # aborta con ERR_PNPM_INVALID_VERSION_UNION (lee lo que sigue al "@"
+  # como número de versión y se encuentra una URL). Eso rompió el deploy
+  # en Vercel del 2026-09-01, cuando Vercel eligió la versión por su
+  # cuenta. Verificado: 10.11.1 ok, 10.28.2 rompe, 10.34.5 ok, 11.24.0 ok.
+  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cbef3fe390df48850037569b336d1a002dc3b8cf: true
