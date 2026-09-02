@@ -9,7 +9,54 @@ decisiones propias de esta app (código, deploy, diseño).
 
 ---
 
-## 2026-09-01 — Deploy en Vercel: caché de dependencias corrupta
+## 2026-09-02 — Deploy: diagnóstico real del ERR_PNPM_INVALID_VERSION_UNION
+
+⚠️ **Esta entrada corrige la del 2026-09-01 de abajo ("caché de
+dependencias corrupta"), cuya conclusión era equivocada.** No era la
+caché de Vercel.
+
+- **Causa real**: la clave de `allowBuilds` en `pnpm-workspace.yaml` tiene
+  forma `nombre@URL`. Las versiones de pnpm del rango 10.2x leen lo que
+  sigue al `@` como número de versión, se encuentran una URL y abortan con
+  `ERR_PNPM_INVALID_VERSION_UNION`. Vercel elegía la versión de pnpm por su
+  cuenta y le tocaba una del rango roto.
+- **Reproducido en aislamiento** (proyecto desechable, misma dependencia
+  git, misma clave), variando solo la versión de pnpm: **10.11.1 ok,
+  10.28.2 rompe con el error idéntico palabra por palabra, 10.34.5 ok,
+  11.24.0 ok**. Y con 10.28.2 fijo, variando solo el
+  `pnpm-workspace.yaml`: con la clave completa rompe, sin la clave
+  instala limpio.
+- **Por qué el pin es obligatorio y no cosmético**: pnpm 10.34.5 *exige* la
+  clave completa para dependencias git (con el nombre solo falla con
+  `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`, y la forma `git+https://...`
+  tampoco le sirve — quiere la URL de tarball de codeload). O sea: no
+  existe un formato de clave que le sirva a 10.34.5 *y* a 10.2x. **El pin
+  `packageManager` es lo único que evita que Vercel vuelva a elegir una
+  versión rota. No sacarlo.**
+- **Por qué no se veía localmente**: el paquete ya compilado estaba en el
+  store de pnpm de la máquina, así que el chequeo de permiso de build
+  nunca se ejecutaba. Recién al cambiar la URL del repo (ver abajo) se
+  invalidó ese store y apareció el problema real.
+- **De paso**: `kalai-checkin` fue transferido a
+  `github.com/martincloos/kalai-checkin` y es **público**. Se actualizó la
+  URL de la dependencia y la clave de `allowBuilds`. El lockfile ahora
+  resuelve por tarball de codeload **con hash de integridad**, que la
+  resolución git anterior no tenía.
+- **Verificado local**: `pnpm install` con `node_modules/kalai-checkin`
+  borrado (fuerza el `prepare` real) compila el paquete;
+  `pnpm install --frozen-lockfile` en sync; `pnpm typecheck` y
+  `pnpm build` limpios (build corrido con env ficticias en memoria, el
+  sitio sigue sin poder buildearse en esta máquina por falta de
+  `.env.local`).
+- ⚠️ **Sigue abierto, es OTRO problema**: el deploy del 2026-09-01 con el
+  pin puesto reportó *15+ minutos en un loop de instalaciones anidadas del
+  `prepare` de kalai-checkin*. Eso no lo arregla este commit — se sabrá en
+  el próximo deploy. Si vuelve a pasar, la salida de fondo es que
+  `kalai-checkin` deje de necesitar build al instalarse (publicar `dist/`
+  compilado en vez de fuente TS), lo que elimina de una la clave de
+  `allowBuilds`, el pin y el loop.
+
+## 2026-09-01 — Deploy en Vercel: caché de dependencias corrupta (CONCLUSIÓN ERRÓNEA, ver entrada de arriba)
 
 - **Qué pasó**: los primeros 3 deploys del commit `b385583` fallaron con
   `ERR_PNPM_INVALID_VERSION_UNION` sobre `kalai-checkin`, incluso con
@@ -37,8 +84,11 @@ decisiones propias de esta app (código, deploy, diseño).
   día).
 - **`allowBuilds` en `pnpm-workspace.yaml`**: el paquete se distribuye como
   fuente TS sin compilar y corre `tsc` al instalarse — hace falta declarar
-  la clave completa `kalai-checkin@git+https://...#sha: true` (no alcanza
-  con el nombre solo, a diferencia de las dependencias del registry).
+  la clave completa (no alcanza con el nombre solo, a diferencia de las
+  dependencias del registry). ⚠️ **Corregido el 2026-09-02**: la forma
+  `kalai-checkin@git+https://...#sha` que se usó acá es la que rompe el
+  deploy en pnpm 10.2x, y además pnpm 10.34.5 tampoco la acepta — la forma
+  correcta es la URL de tarball de codeload. Ver entrada del 2026-09-02.
 - **`canEdit` del check-in usa su propio criterio de staff** (decisión D4):
   admin + secretario + acreditador, no `{admin, secretario}` como el resto
   del roster — el acreditador no gestiona roster pero sí ventanas.
