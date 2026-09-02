@@ -12,8 +12,8 @@ importers:
         specifier: ^2.44.4
         version: 2.112.3
       kalai-checkin:
-        specifier: git+https://github.com/martincloos/kalai-checkin.git#cdfa7c81ddbb548584c9c6e65d8e3614b753742a
-        version: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cdfa7c81ddbb548584c9c6e65d8e3614b753742a(@supabase/supabase-js@2.112.3)(react@19.2.3)
+        specifier: git+https://github.com/martincloos/kalai-checkin.git#462dee7ff04bd3f2b23c465b9a10970bc0c09c01
+        version: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/462dee7ff04bd3f2b23c465b9a10970bc0c09c01(@supabase/supabase-js@2.112.3)(react@19.2.3)
       next:
         specifier: 16.3.0
         version: 16.3.0(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1375,8 +1375,8 @@ packages:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
     engines: {node: '>=4.0'}
 
-  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cdfa7c81ddbb548584c9c6e65d8e3614b753742a:
-    resolution: {gitHosted: true, integrity: sha512-O5abmhhl/YGyz+M+LRPZT8UifKdbXUBeI3OXoEVDNkdtZ2o4FpCwXJfXtx4EIM4JYIoNfKW3YcwrcahkkSdjHQ==, tarball: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cdfa7c81ddbb548584c9c6e65d8e3614b753742a}
+  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/462dee7ff04bd3f2b23c465b9a10970bc0c09c01:
+    resolution: {gitHosted: true, integrity: sha512-EbYanLh8/jWSLSf/vxfm5M9GN0PrlEyiFC/isg8IRHMkvNKX5j9JC3mv342txQXhQjU60qvTnOxHBwB3GG8NYQ==, tarball: https://codeload.github.com/martincloos/kalai-checkin/tar.gz/462dee7ff04bd3f2b23c465b9a10970bc0c09c01}
     version: 0.1.0
     peerDependencies:
       '@supabase/supabase-js': ^2
@@ -3323,7 +3323,7 @@ snapshots:
       object.assign: 4.1.7
       object.values: 1.2.1
 
-  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/cdfa7c81ddbb548584c9c6e65d8e3614b753742a(@supabase/supabase-js@2.112.3)(react@19.2.3):
+  kalai-checkin@https://codeload.github.com/martincloos/kalai-checkin/tar.gz/462dee7ff04bd3f2b23c465b9a10970bc0c09c01(@supabase/supabase-js@2.112.3)(react@19.2.3):
     dependencies:
       '@supabase/supabase-js': 2.112.3
     optionalDependencies:
